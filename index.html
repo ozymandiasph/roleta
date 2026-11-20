@@ -132,7 +132,7 @@ $('hello').textContent = 'Olá, ' + (user ? user.first_name : 'visitante') + '! 
 
 // ---------- Tema ----------
 function applyTheme(light){ document.body.classList.toggle('light', light); drawWheel(); }
-if (tg) applyTheme(tg.colorScheme === 'light');
+if (tg) document.body.classList.toggle('light', tg.colorScheme === 'light'); // só a classe aqui; a roleta é desenhada no início
 $('themeBtn').onclick = () => { applyTheme(!document.body.classList.contains('light')); toast('🎨 No Telegram, o tema segue automaticamente o claro/escuro do app (themeParams).'); };
 
 // ---------- Armazenamento (CloudStorage no Telegram, localStorage aqui) ----------
