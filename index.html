@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roleta de Decisões — demo de Telegram Mini App</title>
+<!-- Dentro do Telegram, este script ativa os recursos nativos. Fora dele (ex.: navegador), a página simula. -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg:#17212b; --card:#232e3c; --text:#f5f5f5; --hint:#8b9aab;
+    --accent:#5288c1; --accent-text:#fff; --tag:#2b5278;
+  }
+  body.light{
+    --bg:#f1f1f4; --card:#ffffff; --text:#1c1c1e; --hint:#707579;
+    --accent:#3390ec; --accent-text:#fff; --tag:#dbe9fb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--text);display:flex;justify-content:center;min-height:100vh;transition:background .3s,color .3s}
+  .phone{width:100%;max-width:420px;min-height:100vh;display:flex;flex-direction:column;position:relative}
+  .topbar{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--card);border-bottom:1px solid rgba(127,127,127,.15)}
+  .back{border:none;background:none;color:var(--accent);font-size:15px;cursor:pointer;visibility:hidden}
+  .topbar h1{font-size:16px;margin:0;flex:1}
+  .theme-btn{border:none;background:var(--tag);color:var(--text);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
+  main{flex:1;padding:16px 16px 110px}
+  .hello{font-size:20px;font-weight:600;margin:4px 0 2px}
+  .sub{color:var(--hint);font-size:14px;margin:0 0 14px}
+  .tag{display:inline-block;font-size:11px;background:var(--tag);color:var(--text);border-radius:6px;padding:2px 7px;margin:2px 0 8px;opacity:.9}
+  .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:14px}
+  .lists{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{border:1px solid var(--accent);background:none;color:var(--accent);border-radius:20px;padding:6px 12px;font-size:13px;cursor:pointer}
+  .chip.on{background:var(--accent);color:var(--accent-text)}
+  textarea{width:100%;min-height:90px;border-radius:10px;border:1px solid rgba(127,127,127,.3);background:var(--bg);color:var(--text);padding:10px;font:inherit;font-size:14px;resize:vertical}
+  .row{display:flex;gap:8px;margin-top:8px}
+  .row input{flex:1;border-radius:10px;border:1px solid rgba(127,127,127,.3);background:var(--bg);color:var(--text);padding:8px 10px;font:inherit;font-size:14px}
+  .small{border:none;background:var(--tag);color:var(--text);border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer}
+  .wheel-wrap{display:flex;justify-content:center;position:relative;margin:6px 0}
+  .pointer{position:absolute;top:-4px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-top:20px solid var(--accent);z-index:2}
+  canvas{max-width:100%;transition:transform 3.2s cubic-bezier(.17,.67,.2,1)}
+  .history{font-size:13px;color:var(--hint);margin:0;padding-left:18px}
+  .mainbtn{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:420px;padding:10px 16px 16px;background:var(--bg)}
+  .mainbtn button{width:100%;border:none;border-radius:12px;padding:15px;font-size:16px;font-weight:600;background:var(--accent);color:var(--accent-text);cursor:pointer}
+  .mainbtn button:disabled{opacity:.5}
+  .mainbtn .tag{display:block;text-align:center;margin:0 0 6px}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:10;padding:20px}
+  .popup{background:var(--card);border-radius:14px;padding:20px;max-width:300px;width:100%;text-align:center}
+  .popup h2{margin:0 0 6px;font-size:15px;color:var(--hint);font-weight:500}
+  .popup .res{font-size:26px;font-weight:700;margin:6px 0 16px}
+  .popup .btns{display:flex;gap:8px}
+  .popup button{flex:1;border:none;border-radius:10px;padding:10px;font-size:14px;cursor:pointer}
+  .popup .ok{background:var(--accent);color:var(--accent-text)}
+  .popup .send{background:var(--tag);color:var(--text)}
+  .toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--card);color:var(--text);padding:10px 14px;border-radius:10px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.3);display:none;z-index:20;max-width:360px}
+  .mode{font-size:12px;color:var(--hint);text-align:center;margin:0 0 12px}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="topbar">
+    <button class="back" id="back">‹ Voltar</button>
+    <h1>🎡 Roleta de Decisões</h1>
+    <button class="theme-btn" id="themeBtn">☀️/🌙</button>
+  </div>
+
+  <main>
+    <p class="mode" id="mode"></p>
+
+    <div class="hello" id="hello">Olá!</div>
+    <span class="tag">👤 Dados do usuário — o Telegram já sabe quem você é, sem login</span>
+    <p class="sub">Escolha uma lista ou escreva suas opções, uma por linha.</p>
+
+    <div class="card">
+      <span class="tag">☁️ CloudStorage — listas salvas na sua conta do Telegram</span>
+      <div class="lists" id="lists"></div>
+      <div class="row">
+        <input id="newName" placeholder="Nome da nova lista (ex.: Série)">
+        <button class="small" id="saveList">Salvar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <textarea id="options"></textarea>
+    </div>
+
+    <div class="card">
+      <div class="wheel-wrap">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="300" height="300"></canvas>
+      </div>
+      <span class="tag">📳 HapticFeedback — o celular vibra quando a roleta para</span>
+    </div>
+
+    <div class="card">
+      <strong style="font-size:14px">Últimos resultados</strong>
+      <ul class="history" id="history"><li>Nenhum ainda</li></ul>
+    </div>
+  </main>
+
+  <div class="mainbtn">
+    <span class="tag">🔵 MainButton — botão nativo do Telegram, controlado pela página</span>
+    <button id="spin">GIRAR</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="popup">
+    <h2>A roleta escolheu:</h2>
+    <div class="res" id="result"></div>
+    <span class="tag">💬 showPopup — pop-up nativo</span>
+    <div class="btns">
+      <button class="send" id="sendBtn">Enviar ao chat</button>
+      <button class="ok" id="okBtn">OK</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const tg = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) ? window.Telegram.WebApp : null;
+const $ = id => document.getElementById(id);
+
+// ---------- Modo: dentro do Telegram ou simulação ----------
+$('mode').textContent = tg
+  ? '✅ Rodando dentro do Telegram — recursos nativos ativos'
+  : '🧪 Modo simulação (navegador). Dentro do Telegram, os itens marcados viram recursos nativos.';
+if (tg) { tg.ready(); tg.expand(); }
+
+// ---------- Dados do usuário ----------
+const user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+$('hello').textContent = 'Olá, ' + (user ? user.first_name : 'visitante') + '! 👋';
+
+// ---------- Tema ----------
+function applyTheme(light){ document.body.classList.toggle('light', light); drawWheel(); }
+if (tg) applyTheme(tg.colorScheme === 'light');
+$('themeBtn').onclick = () => { applyTheme(!document.body.classList.contains('light')); toast('🎨 No Telegram, o tema segue automaticamente o claro/escuro do app (themeParams).'); };
+
+// ---------- Armazenamento (CloudStorage no Telegram, localStorage aqui) ----------
+const DEFAULT = {
+  'Almoço': ['Pizza','Hambúrguer','Japonês','Marmita','Churrasco'],
+  'Filme da noite': ['Comédia','Ação','Terror','Documentário'],
+  'Quem paga o café': ['Eu','Você','Par ou ímpar']
+};
+let store = DEFAULT;
+function save(){
+  const s = JSON.stringify(store);
+  if (tg && tg.CloudStorage) { try{ tg.CloudStorage.setItem('listas', s); }catch(e){} }
+  try{ localStorage.setItem('roleta_listas', s); }catch(e){}
+}
+function load(cb){
+  if (tg && tg.CloudStorage) {
+    try{ tg.CloudStorage.getItem('listas', (err,val)=>{ if(!err && val){ try{store=JSON.parse(val);}catch(e){} } cb(); }); return; }catch(e){}
+  }
+  try{ const v = localStorage.getItem('roleta_listas'); if (v) store = JSON.parse(v); }catch(e){}
+  cb();
+}
+let current = 'Almoço';
+function renderLists(){
+  $('lists').innerHTML = '';
+  Object.keys(store).forEach(name=>{
+    const b = document.createElement('button');
+    b.className = 'chip' + (name===current?' on':'');
+    b.textContent = name;
+    b.onclick = () => { current = name; $('options').value = store[name].join('\n'); renderLists(); drawWheel(); haptic('select'); };
+    $('lists').appendChild(b);
+  });
+}
+$('saveList').onclick = () => {
+  const name = $('newName').value.trim();
+  const opts = getOptions();
+  if (!name) return toast('Dê um nome para a lista.');
+  if (opts.length < 2) return toast('Coloque pelo menos 2 opções.');
+  store[name] = opts; current = name; save(); renderLists(); $('newName').value='';
+  toast('☁️ Lista "'+name+'" salva' + (tg ? ' na nuvem do Telegram.' : ' (no Telegram, iria para o CloudStorage e apareceria em qualquer aparelho).'));
+};
+
+// ---------- Roleta ----------
+function getOptions(){ return $('options').value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,12); }
+$('options').addEventListener('input', drawWheel);
+const COLORS = ['#5288c1','#e17076','#7bc862','#e5a64e','#65aadd','#a695e7','#ee7aae','#6ec9cb'];
+function drawWheel(){
+  const c = $('wheel'), ctx = c.getContext('2d'), opts = getOptions();
+  const n = Math.max(opts.length,1), r = 145, cx = 150, cy = 150;
+  ctx.clearRect(0,0,300,300);
+  for (let i=0;i<n;i++){
+    const a0 = -Math.PI/2 + i*2*Math.PI/n, a1 = a0 + 2*Math.PI/n;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,a0,a1); ctx.closePath();
+    ctx.fillStyle = COLORS[i%COLORS.length]; ctx.fill();
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate((a0+a1)/2);
+    ctx.fillStyle='#fff'; ctx.font='bold 13px sans-serif'; ctx.textAlign='right';
+    ctx.fillText((opts[i]||'?').slice(0,16), r-10, 5); ctx.restore();
+  }
+  ctx.beginPath(); ctx.arc(cx,cy,16,0,2*Math.PI); ctx.fillStyle=getComputedStyle(document.body).getPropertyValue('--card'); ctx.fill();
+}
+
+let rotation = 0, spinning = false, last = null;
+const history = [];
+function spin(){
+  const opts = getOptions();
+  if (opts.length < 2) return toast('Coloque pelo menos 2 opções.');
+  if (spinning) return;
+  spinning = true; setMain(false,'GIRANDO...'); showBack(true);
+  const n = opts.length, idx = Math.floor(Math.random()*n);
+  const seg = 360/n;
+  const target = 360 - (idx*seg + seg/2);
+  rotation += 360*5 + ((target - rotation%360) + 360)%360;
+  $('wheel').style.transform = 'rotate('+rotation+'deg)';
+  setTimeout(()=>{
+    spinning = false; last = opts[idx];
+    haptic('success');
+    history.unshift(last); if (history.length>5) history.pop();
+    $('history').innerHTML = history.map(h=>'<li>'+h.replace(/</g,'&lt;')+'</li>').join('');
+    showResult(last);
+    setMain(true,'GIRAR DE NOVO');
+  }, 3300);
+}
+
+// ---------- Botão principal ----------
+function setMain(enabled, text){
+  if (tg){ tg.MainButton.setText(text); enabled ? tg.MainButton.enable() : tg.MainButton.disable(); }
+  $('spin').disabled = !enabled; $('spin').textContent = text;
+}
+$('spin').onclick = spin;
+if (tg){ tg.MainButton.setText('GIRAR'); tg.MainButton.show(); tg.MainButton.onClick(spin); document.querySelector('.mainbtn').style.display='none'; }
+
+// ---------- Voltar ----------
+function showBack(on){
+  if (tg){ on ? tg.BackButton.show() : tg.BackButton.hide(); }
+  $('back').style.visibility = on ? 'visible' : 'hidden';
+}
+function resetAll(){ history.length=0; $('history').innerHTML='<li>Nenhum ainda</li>'; showBack(false); setMain(true,'GIRAR'); }
+$('back').onclick = () => { resetAll(); toast('↩️ BackButton — no Telegram ele aparece no topo da janela.'); };
+if (tg) tg.BackButton.onClick(resetAll);
+
+// ---------- Vibração ----------
+function haptic(kind){
+  try{
+    if (tg && tg.HapticFeedback){ kind==='success' ? tg.HapticFeedback.notificationOccurred('success') : tg.HapticFeedback.selectionChanged(); }
+    else if (navigator.vibrate){ navigator.vibrate(kind==='success'?[60,40,60]:15); }
+  }catch(e){}
+}
+
+// ---------- Pop-up de resultado ----------
+function showResult(txt){
+  if (tg && tg.showPopup){
+    tg.showPopup({title:'A roleta escolheu:', message:txt, buttons:[{id:'send',type:'default',text:'Enviar ao chat'},{type:'ok'}]},
+      id => { if (id==='send') sendToChat(); });
+    return;
+  }
+  $('result').textContent = txt; $('overlay').style.display='flex';
+}
+$('okBtn').onclick = () => $('overlay').style.display='none';
+$('sendBtn').onclick = () => { $('overlay').style.display='none'; sendToChat(); };
+
+// ---------- Enviar dados ao bot ----------
+function sendToChat(){
+  const payload = {lista: current, resultado: last, quando: new Date().toISOString()};
+  if (tg){ tg.showAlert('📤 Aqui o resultado iria para o bot e, dele, para o n8n. Isso fica para a fase 2!'); return; }
+  toast('📤 sendData — no Telegram isto iria para o bot (e dele para o n8n):\n' + JSON.stringify(payload));
+}
+
+// ---------- Avisos ----------
+let tt;
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(tt); tt=setTimeout(()=>t.style.display='none',4200); }
+
+// ---------- Início ----------
+load(()=>{ if(!store[current]) current = Object.keys(store)[0]; $('options').value = store[current].join('\n'); renderLists(); drawWheel(); });
+</script>
+</body>
+</html>
